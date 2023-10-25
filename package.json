@@ -1,0 +1,29 @@
+{
+  "name": "ecomly",
+  "version": "1.0.0",
+  "description": "E-commerce app backend",
+  "main": "app.js",
+  "scripts": {
+    "start": "nodemon app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/NonymousMorlock/ecomly_server.git"
+  },
+  "author": "dbestech",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NonymousMorlock/ecomly_server/issues"
+  },
+  "homepage": "https://github.com/NonymousMorlock/ecomly_server#readme",
+  "dependencies": {
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "mongodb": "^6.2.0",
+    "mongoose": "^7.6.3",
+    "morgan": "^1.10.0",
+    "nodemon": "^3.0.1"
+  }
+}
