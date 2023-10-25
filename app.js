@@ -12,6 +12,11 @@ app.use(bodyParser.json());
 app.use(morgan('tiny'));
 
 // ROUTES
+const API = env.API_URL;
+app.use(`${API}/users`);
+app.use(`${API}/products`);
+app.use(`${API}/categories`);
+app.use(`${API}/orders`);
 
 // SERVER && DATABASE
 PORT = env.PORT;
