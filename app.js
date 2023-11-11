@@ -1,36 +1,58 @@
-const bodyParser = require('body-parser');
 const express = require('express');
+const bodyParser = require('body-parser');
 const morgan = require('morgan');
 const mongoose = require('mongoose');
+const cors = require('cors');
+const authJwt = require('./middlewares/jwt');
+const errorHandler = require('./middlewares/error_handler');
+
 require('dotenv/config');
 
-const env = process.env;
-const app = express();
+// require('crypto').randomBytes(48, function (err, buffer) {
+//   const token = buffer.toString('hex');
+//   console.log(token);
+// });
 
-// MIDDLEWARES
+const app = express();
+const env = process.env;
+
+app.use(cors());
+app.options('*', cors());
 app.use(bodyParser.json());
 app.use(morgan('tiny'));
+app.use(authJwt());
+app.use(errorHandler);
 
-// ROUTES
+const productsRouter = require('./routes/products');
+const categoriesRouter = require('./routes/categories');
+const ordersRouter = require('./routes/orders');
+const usersRouter = require('./routes/users');
+const authRouter = require('./routes/auth');
+const adminRouter = require('./routes/admin');
+
 const API = env.API_URL;
-app.use(`${API}/users`);
-app.use(`${API}/products`);
-app.use(`${API}/categories`);
-app.use(`${API}/orders`);
 
-// SERVER && DATABASE
-PORT = env.PORT;
-IP = env.IP;
+app.use(`${API}/products`, productsRouter);
+app.use(`${API}/categories`, categoriesRouter);
+app.use(`${API}/orders`, ordersRouter);
+app.use(`${API}/users`, usersRouter);
+app.use(`${API}/`, authRouter);
+app.use(`${API}/admin`, adminRouter);
+app.use('/public', express.static(__dirname + '/public'));
 
+require('./helpers/cron_job');
 mongoose
   .connect(env.CONNECTION_STRING)
   .then(() => {
-    console.log('Connected to the database');
+    console.log('Connected to Database');
   })
-  .catch((err) => {
-    console.log(err);
+  .catch((error) => {
+    console.log(error);
   });
 
+const PORT = env.PORT;
+const IP = env.IP;
+
 app.listen(PORT, IP, () => {
-  console.log(`Server running on http://${IP}:${PORT}`);
+  console.log(`Server is running on http://${IP}:${PORT}`);
 });
