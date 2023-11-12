@@ -1,6 +1,7 @@
 const multer = require('multer');
 const util = require('util');
-const { unlink } = require('node:fs');
+const { unlink } = require('fs').promises;
+const path = require('path');
 
 const ALLOWED_EXTENSIONS = {
   'image/png': 'png',
@@ -9,10 +10,10 @@ const ALLOWED_EXTENSIONS = {
 };
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
+  destination: function (_, __, cb) {
     cb(null, 'public/uploads');
   },
-  filename: function (req, file, cb) {
+  filename: function (_, file, cb) {
     const filename = file.originalname
       .replace(' ', '-')
       .replace('.png', '')
@@ -26,7 +27,7 @@ const storage = multer.diskStorage({
 exports.upload = multer({
   storage: storage,
   limits: { fileSize: 1024 * 1024 * 5 },
-  fileFilter: (req, file, cb) => {
+  fileFilter: (_, file, cb) => {
     const isValid = ALLOWED_EXTENSIONS[file.mimetype];
     let uploadError = new Error(
       `Invalid image type\n${file.mimetype} is not allowed`
@@ -36,22 +37,28 @@ exports.upload = multer({
     return cb(uploadError);
   },
 });
-
-exports.deleteImages = async function deleteImages(imageUrls) {
+exports.deleteImages = async function deleteImages(
+  imageUrls,
+  continueOnErrorName
+) {
   await Promise.all(
     imageUrls.map(async (imageUrl) => {
-      const imagePath = path.join(
+      const imagePath = path.resolve(
         __dirname,
+        '..',
         'public',
         'uploads',
         path.basename(imageUrl)
       );
       try {
-        const unlinkOperation = util.promisify(unlink(imagePath));
-        await unlinkOperation();
+        await unlink(imagePath);
       } catch (error) {
-        console.error(`Error deleting image: ${error.message}`);
-        throw error;
+        if (error.code === continueOnErrorName) {
+          console.error(`Continuing with the next image: ${error.message}`);
+        } else {
+          console.error(`Error deleting image: ${error.message}`);
+          throw error;
+        }
       }
     })
   );

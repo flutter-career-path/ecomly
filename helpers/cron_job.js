@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { Product } = require('../models/product');
 const { Order } = require('../models/order');
+const { Category } = require('../models/category');
 
 cron.schedule('0 0 * * *', async function () {
   try {
@@ -23,10 +24,20 @@ cron.schedule('0 0 * * *', async function () {
           await product.save();
         }
       }
-
       // Update the order status to canceled
       order.status = 'expired';
       await order.save();
+    }
+
+    const categoriesToBeDeleted = await Category.find({
+      markedForDeletion: true,
+    });
+
+    for (const category of categoriesToBeDeleted) {
+      const categoryProductsCount = await Product.countDocuments({
+        category: category.id,
+      });
+      if (categoryProductsCount < 1) await category.deleteOne();
     }
 
     console.log('CRON job completed at', new Date());

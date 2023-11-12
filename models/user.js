@@ -1,4 +1,5 @@
 const { Schema, model } = require('mongoose');
+
 const userSchema = Schema({
   name: { type: String, required: true, trim: true },
   email: {
@@ -6,14 +7,7 @@ const userSchema = Schema({
     required: true,
     trim: true,
   },
-  passwordHash: {
-    type: String,
-    required: true,
-    validate: {
-      validator: (value) => {},
-      message: 'Password must be at least 8 charac',
-    },
-  },
+  passwordHash: { type: String, required: true },
   street: String,
   apartment: String,
   city: String,

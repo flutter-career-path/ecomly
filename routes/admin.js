@@ -20,11 +20,16 @@ router.get('/orders/count', adminController.getOrdersCount);
 
 router.put('/orders/:id', adminController.changeOrderStatus);
 
-router.delete('/order/:id', adminController.deleteOrder);
+// We reserve the rights to delete orders, both past and present to admins only because
+// Most of the time, users rely on their history for tracking, reference and so on, or even reordering items
+// also, when there are disputes, or a user suddenly claims something went wrong with some order, but they 
+// have already deleted it, how is that issue going to be resolved??
+// these and many other reasons is why we usually reserve the rights to deleting an order to admins alone
+router.delete('/orders/:id', adminController.deleteOrder);
 
 // PRODUCTS
 
-router.get('products/count', adminController.getProductsCount);
+router.get('/products/count', adminController.getProductsCount);
 
 router.post('/products/', adminController.addProduct);
 

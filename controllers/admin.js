@@ -1,11 +1,14 @@
 const { CartProduct } = require('../models/cart_product');
+const { Category } = require('../models/category');
 const { OrderItem } = require('../models/order_item');
 const { Order } = require('../models/order');
+const { Review } = require('../models/review');
 const { User } = require('../models/user');
-const { Category } = require('../models/category');
 const util = require('util');
 const media_helper = require('../helpers/media_helper');
 const { Product } = require('../models/product');
+const multer = require('multer');
+const mongoose = require('mongoose');
 
 exports.getUserCount = async (_, res) => {
   try {
@@ -23,12 +26,17 @@ exports.deleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
 
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
     // Remove user's orders and associated order items
-    await Order.deleteMany({ user: userId });
-    await OrderItem.deleteMany({ user: userId });
+    const orders = await Order.find({ user: userId });
+
+    // Extract order item IDs from all orders
+    const orderItemIds = orders.flatMap((order) => order.orderItems);
 
     // Remove user's cart products
-    await CartProduct.deleteMany({ user: userId });
+    await CartProduct.deleteMany({ _id: { $in: user.cart } });
 
     // Remove references to cart products from the user document
     await User.findByIdAndUpdate(userId, {
@@ -36,10 +44,16 @@ exports.deleteUser = async (req, res) => {
     });
 
     // Remove user's reviews
-    await Review.deleteMany({ user: userId });
+    // await Review.deleteMany({ user: userId });
+
+    // Remove user's orders and associated order items
+    await Order.deleteMany({ user: userId });
+
+    // Remove all order items associated with the user
+    await OrderItem.deleteMany({ _id: { $in: orderItemIds } });
 
     // Finally, remove the user
-    const deletedUser = await User.findByIdAndRemove(userId);
+    const deletedUser = await User.deleteOne({ _id: userId });
 
     if (!deletedUser) {
       return res.status(404).json({ message: 'User not found' });
@@ -87,17 +101,18 @@ exports.editCategory = async (req, res) => {
   }
 };
 
-exports.deleteCategory = (req, res) => {
-  Category.findByIdAndRemove(req.params.id)
-    .then((category) => {
-      if (category) {
-        return res.status(204).end();
-      }
+exports.deleteCategory = async (req, res) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
       return res.status(404).json({ message: 'Category not found' });
-    })
-    .catch((err) => {
-      return res.status(500).json({ message: err.message });
-    });
+    }
+    category.markedForDeletion = true;
+    await category.save();
+    return res.status(204).end();
+  } catch (err) {
+    return res.status(500).json({ type: err.name, message: err.message });
+  }
 };
 
 // ORDER
@@ -166,12 +181,12 @@ exports.changeOrderStatus = async (req, res) => {
 
 exports.deleteOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndRemove(req.params.id);
+    const order = await Order.findByIdAndDelete(req.params.id);
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }
     for (const orderItemId of order.orderItems) {
-      await OrderItem.findByIdAndRemove(orderItemId);
+      await OrderItem.findByIdAndDelete(orderItemId);
     }
     return res.status(204).end();
   } catch (err) {
@@ -196,30 +211,35 @@ exports.getProductsCount = async (req, res) => {
 exports.addProduct = async (req, res) => {
   try {
     // always make sure to call your middleware first since we aren't putting it directly in the router's arguments
-    const mainImageUpload = util.promisify(media_helper.upload.single('image'));
-    const galleryUpload = util.promisify(media_helper.upload.array('images'));
+    const imagesUpload = util.promisify(
+      media_helper.upload.fields([
+        { name: 'image', maxCount: 1 },
+        { name: 'images', maxCount: 10 },
+      ])
+    );
 
-    await mainImageUpload(req, res);
-    await galleryUpload(req, res);
+    try {
+      await imagesUpload(req, res);
+    } catch (err) {
+      return res.status(500).json({
+        type: err.code,
+        message: `${err.message}{${err.field}}`,
+        storageErrors: err.storageErrors,
+      });
+    }
 
     const category = await Category.findById(req.body.category);
     if (!category) return res.status(404).json({ message: 'Invalid Category' });
-
-    const image = req.file;
+    const image = req.files['image'][0];
     if (!image) return res.status(404).json({ message: 'No file found' });
-
     // this will fetch the filename from our setup at the top
-    const filename = req.file.filename;
-    const basePath = `${req.protocol}://${req.get('host')}/public/uploads`;
-    req.body['image'] = `${basePath}/${filename}`;
+    req.body['image'] = `${req.protocol}://${req.get('host')}/${image.path}`;
 
-    const gallery = req.files;
+    const gallery = req.files['images'];
     const imagePaths = [];
-    if (gallery) {
-      for (const image in gallery) {
-        const filename = image.filename;
-        const basePath = `${req.protocol}://${req.get('hose')}/public/uploads`;
-        const imagePath = `${basePath}/${filename}`;
+    if (gallery && gallery.length > 0) {
+      for (const image of gallery) {
+        const imagePath = `${req.protocol}://${req.get('host')}/${image.path}`;
         imagePaths.push(imagePath);
       }
     }
@@ -248,47 +268,54 @@ exports.addProduct = async (req, res) => {
 
 exports.editProduct = async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.id)) {
+    if (
+      !mongoose.isValidObjectId(req.params.id) ||
+      !(await Product.findById(req.params.id))
+    ) {
       return res.status(404).json({ message: 'Invalid Product' });
-    }
-    const galleryUpdate = req.files != undefined;
-    if (galleryUpdate) {
-      const product = await Product.findById(req.params.id);
-      if (!product)
-        return res.status(404).json({ message: 'Product not found' });
-
-      const limit = 10 - product.images.length;
-
-      const galleryUpload = util.promisify(
-        media_helper.upload.array('images', limit)
-      );
-
-      await galleryUpload(req, res);
-
-      const images = req.files;
-      const imagePaths = [];
-      for (const image of images) {
-        const filename = image.filename;
-        const basePath = `${req.protocol}://${req.get('host')}/public/uploads`;
-        const imagePath = `${basePath}/${filename}`;
-        imagePaths.push(imagePath);
-      }
-      req.body['images'] = [...product.images, ...imagePaths];
     }
     if (req.body.category) {
       const category = await Category.findById(req.body.category);
       if (!category)
         return res.status(404).json({ message: 'Invalid Category' });
     }
-    const product = await Product.findByIdAndUpdate(
+
+    const product = await Product.findById(req.params.id);
+
+    const limit = 10 - product.images.length;
+    const galleryUpload = util.promisify(
+      media_helper.upload.fields([{ name: 'images', maxCount: limit }])
+    );
+    try {
+      await galleryUpload(req, res);
+    } catch (err) {
+      console.error('ERROR: ', err);
+      return res.status(500).json({
+        type: err.code,
+        message: `${err.message}{${err.field}}`,
+        storageErrors: err.storageErrors,
+      });
+    }
+    const imageFiles = req.files['images'];
+    const galleryUpdate = imageFiles && imageFiles.length > 0;
+    if (galleryUpdate) {
+      const images = req.files['images'];
+      const imagePaths = [];
+      for (const image of images) {
+        const imagePath = `${req.protocol}://${req.get('host')}/${image.path}`;
+        imagePaths.push(imagePath);
+      }
+      req.body['images'] = [...product.images, ...imagePaths];
+    }
+    const updatedProduct = await Product.findByIdAndUpdate(
       req.params.id,
       { ...req.body },
       { new: true }
     );
-    if (!product) {
+    if (!updatedProduct) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    return res.json(product);
+    return res.json(updatedProduct);
   } catch (err) {
     if (err instanceof multer.MulterError) {
       return res.status(err.code).json({ message: err.message });
@@ -355,7 +382,10 @@ exports.deleteProduct = async (req, res) => {
     }
 
     // Delete related images
-    await media_helper.deleteImages([...product.images, product.image]);
+    await media_helper.deleteImages(
+      [...product.images, product.image],
+      'ENOENT'
+    );
 
     // Delete associated reviews
     await Review.deleteMany({ _id: { $in: product.reviews } });
@@ -366,13 +396,6 @@ exports.deleteProduct = async (req, res) => {
     return res.status(204).end(); // 204 No Content for a successful deletion
   } catch (error) {
     console.error(`Error deleting product: ${error.message}`);
-    // Handle file not found explicitly
-    if (error.code === 'ENOENT') {
-      return res.status(404).json({ message: 'Image not found' });
-    }
-
-    // Handle other errors
-    console.error(`Error deleting image: ${error.message}`);
     return res.status(500).json({ message: error.message });
   }
 };

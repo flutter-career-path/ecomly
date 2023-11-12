@@ -51,8 +51,12 @@ async function createOrderWithRetry(req, res, retries) {
           message: 'Invalid product in the order',
         });
       }
-      const orderItemModel = await new OrderItem(orderItem).save({ session });
+      let orderItemModel = new OrderItem(orderItem);
       const product = await Product.findById(orderItem.product);
+      orderItemModel.productPrice = product.price;
+      orderItemModel.productName = product.name;
+      orderItemModel.productImage = product.image;
+      orderItemModel = await orderItemModel.save({ session });
       if (!orderItemModel || product.countInStock < orderItemModel.quantity) {
         await session.abortTransaction();
         await session.endSession();
@@ -173,6 +177,11 @@ exports.getUserOrders = async (req, res) => {
 
 exports.getOrderById = async (req, res) => {
   try {
+    if (req.params.id.toLowerCase() === 'count') {
+      return res
+        .status(403)
+        .json({ message: 'This is an admin route. Access forbidden' });
+    }
     const order = await Order.findById(req.params.id)
       .select('-statusHistory')
       .populate('user', 'name email')

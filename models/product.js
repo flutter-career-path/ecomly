@@ -20,7 +20,10 @@ const productSchema = Schema({
 });
 
 productSchema.virtual('numberOfReviews').get(() => {
-  return this.reviews.length;
+  if (this.reviews) {
+    return this.reviews.length;
+  }
+  return 0;
 });
 
 productSchema.set('toJSON', { virtuals: true });

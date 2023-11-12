@@ -1,4 +1,5 @@
 const { expressjwt: expJwt } = require('express-jwt');
+const { Token } = require('../models/token');
 
 function authJwt() {
   const secret = process.env.ACCESS_TOKEN_SECRET;
@@ -22,7 +23,24 @@ function authJwt() {
 
 async function isRevoked(req, jwt) {
   // Check if the user is not an admin and is trying to access an admin route
-  return !jwt.payload.isAdmin && req.baseUrl.includes('admin');
+  const authHeader = req.header('Authorization');
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    // Handle the case where the Authorization header is missing or invalid
+    return true;
+  }
+
+  const accessToken = authHeader.replace('Bearer', '').trim();
+  const token = await Token.findOne({
+    accessToken: accessToken,
+  });
+
+  // Use a regex to match admin routes in the original URL
+  const adminRouteRegex = /^\/api\/v1\/admin\//i;
+  const adminFault =
+    !jwt.payload.isAdmin && adminRouteRegex.test(req.originalUrl);
+
+  return adminFault || !token;
 }
 
 module.exports = authJwt;
