@@ -117,6 +117,31 @@ exports.deleteCategory = async (req, res) => {
 
 // ORDER
 
+exports.getOrders = async (_, res) => {
+  try {
+    const orders = await Order.find()
+      .select('-statusHistory')
+      .populate('user', 'name email')
+      // newest to oldest
+      .sort({ dateOrdered: -1 })
+      // oldest to newest is by default.... .sort('dateOrdered')
+      .populate({
+        path: 'orderItems',
+        populate: {
+          path: 'product',
+          select: 'name',
+          populate: { path: 'category', select: 'name' },
+        },
+      });
+    if (!orders) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    return res.json(orders);
+  } catch (err) {
+    return res.status(500).json({ type: err.name, message: err.message });
+  }
+};
+
 exports.getOrdersCount = async (_, res) => {
   try {
     const count = await Order.countDocuments();

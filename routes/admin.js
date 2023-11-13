@@ -16,6 +16,8 @@ router.put('/categories/:id', adminController.editCategory);
 router.delete('/categories/:id', adminController.deleteCategory);
 
 // ORDER
+router.get('/orders/', adminController.getOrders);
+
 router.get('/orders/count', adminController.getOrdersCount);
 
 router.put('/orders/:id', adminController.changeOrderStatus);

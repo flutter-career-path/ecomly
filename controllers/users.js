@@ -17,18 +17,14 @@ exports.getUsers = async (_, res) => {
 exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select(
-      '-passwordHash, -_id'
+      '-passwordHash, -_id -cart -wishlist'
     );
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    const token =
-      req.header('Authorization')?.split(' ')[1] ||
-      req.headers.authorization?.split(' ')[1];
-    const userDoc = user._doc;
-    userDoc['passwordHash'] = undefined;
-    userDoc['id'] = req.params.id;
-    return res.json({ ...userDoc, token });
+    user._doc.id = req.params.id;
+    user._doc.passwordHash = undefined;
+    return res.json(user._doc);
   } catch (err) {
     return res.status(500).json({ type: err.name, message: err.message });
   }

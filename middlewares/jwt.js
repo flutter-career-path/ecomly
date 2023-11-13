@@ -15,6 +15,15 @@ function authJwt() {
 
       `${API}/register`,
       `${API}/register/`,
+
+      `${API}/forgot-password`,
+      `${API}/forgot-password/`,
+
+      `${API}/verify-otp`,
+      `${API}/verify-otp/`,
+
+      `${API}/reset-password`,
+      `${API}/reset-password/`,
       // /\/public\/uploads(.*)/
       { url: /\/public\/.*/, methods: ['GET', 'OPTIONS'] },
     ],

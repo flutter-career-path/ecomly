@@ -6,7 +6,7 @@ const cors = require('cors');
 const authJwt = require('./middlewares/jwt');
 const errorHandler = require('./middlewares/error_handler');
 
-require('dotenv/config');
+require('dotenv').config();
 
 // require('crypto').randomBytes(48, function (err, buffer) {
 //   const token = buffer.toString('hex');
