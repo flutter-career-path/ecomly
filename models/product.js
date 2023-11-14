@@ -26,6 +26,17 @@ productSchema.virtual('numberOfReviews').get(() => {
   return 0;
 });
 
+productSchema.pre('save', async function (next) {
+  if (this.reviews.length > 0) {
+    const totalRating = this.reviews.reduce(
+      (acc, review) => acc + review.rating,
+      0
+    );
+    this.rating = totalRating / this.reviews.length;
+  }
+  next();
+});
+
 productSchema.set('toJSON', { virtuals: true });
 productSchema.set('toObject', { virtuals: true });
 

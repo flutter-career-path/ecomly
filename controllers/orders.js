@@ -131,7 +131,6 @@ exports.addOrder = async (req, res) => {
 exports.getUserOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.params.userId })
-      .select('-statusHistory')
       .populate({
         path: 'orderItems',
         populate: {
@@ -144,7 +143,19 @@ exports.getUserOrders = async (req, res) => {
     if (!orders) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    return res.json(orders);
+    const completed = [];
+    const active = [];
+    const cancelled = [];
+    for (const order of orders) {
+      if (order.status === 'delivered') {
+        completed.push(order);
+      } else if (['cancelled', 'expired'].includes(order.status)) {
+        cancelled.push(order);
+      } else {
+        active.push(order);
+      }
+    }
+    return res.json({ total: orders.length, active, completed, cancelled });
   } catch (err) {
     return res.status(500).json({ type: err.name, message: err.message });
   }

@@ -1,9 +1,10 @@
 const jwt = require('jsonwebtoken');
 const { default: mongoose } = require('mongoose');
 
-async function authorizePostRequests(_, req, res, next) {
+async function authorizePostRequests(req, res, next) {
   if (req.method !== 'POST') return next();
   if (req.originalUrl.startsWith(`${process.env.API_URL}/admin`)) return next();
+
   const message =
     "User conflict!\nThe user making the request doesn't match the user in the request.";
   const authHeader = req.header('Authorization');
