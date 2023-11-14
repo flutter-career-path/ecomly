@@ -33,9 +33,13 @@ productSchema.pre('save', async function (next) {
       0
     );
     this.rating = totalRating / this.reviews.length;
+
+    // Ensure the rating is between 0.0 and 5.0
+    this.rating = Math.max(0.0, Math.min(5.0, this.rating));
   }
   next();
 });
+
 
 productSchema.set('toJSON', { virtuals: true });
 productSchema.set('toObject', { virtuals: true });

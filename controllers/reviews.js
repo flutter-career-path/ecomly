@@ -37,7 +37,7 @@ exports.getProductReviews = async function (req, res) {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
-    const page = req.query.page ?? 1; // Default to page 1 if not specified
+    const page = req.query.page || 1; // Default to page 1 if not specified
     const pageSize = 10; // Number of reviews per page, adjust as needed
 
     const reviews = await Review.find({
