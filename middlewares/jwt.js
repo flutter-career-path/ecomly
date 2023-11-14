@@ -1,6 +1,5 @@
 const { expressjwt: expJwt } = require('express-jwt');
 const { Token } = require('../models/token');
-const jsonWT = require('jsonwebtoken');
 
 function authJwt() {
   const secret = process.env.ACCESS_TOKEN_SECRET;
@@ -32,7 +31,6 @@ function authJwt() {
 }
 
 async function isRevoked(req, jwt) {
-  console.log('ORIGINAL URL', req.originalUrl.inlcudes('users/'));
   // Check if the user is not an admin and is trying to access an admin route
   const authHeader = req.header('Authorization');
 
@@ -42,12 +40,6 @@ async function isRevoked(req, jwt) {
   }
 
   const accessToken = authHeader.replace('Bearer', '').trim();
-  const tokenData = jsonWT.decode(accessToken);
-
-  if (req.body.user) {
-    return tokenData.id !== req.body.user;
-  }
-
   const token = await Token.findOne({
     accessToken: accessToken,
   });
