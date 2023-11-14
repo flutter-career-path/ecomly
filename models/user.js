@@ -14,7 +14,17 @@ const userSchema = Schema({
   zip: String,
   country: String,
   phone: { type: String, required: true, trim: true },
-  wishlist: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
+  wishlist: [
+    {
+      productId: {
+        type: Schema.Types.ObjectId,
+        ref: 'Product',
+        required: true,
+      },
+      productName: { type: String, required: true },
+      productImage: { type: String, required: true },
+    },
+  ],
   cart: [{ type: Schema.Types.ObjectId, ref: 'CartProduct' }],
   isAdmin: { type: Boolean, default: false },
   resetPasswordOtp: Number,

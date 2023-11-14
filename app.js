@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const authJwt = require('./middlewares/jwt');
 const errorHandler = require('./middlewares/error_handler');
+const authorizePostRequests = require('./middlewares/authorization');
 
 require('dotenv').config();
 
@@ -21,6 +22,7 @@ app.options('*', cors());
 app.use(bodyParser.json());
 app.use(morgan('tiny'));
 app.use(authJwt());
+app.use(authorizePostRequests);
 app.use(errorHandler);
 
 const productsRouter = require('./routes/products');

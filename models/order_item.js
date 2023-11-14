@@ -13,6 +13,8 @@ const orderItemSchema = Schema({
   productImage: { type: String, required: true },
   productPrice: { type: Number, required: true },
   quantity: { type: Number, default: 1 },
+  selectedSize: String,
+  selectedColour: String,
 });
 
 exports.OrderItem = model('OrderItem', orderItemSchema);
