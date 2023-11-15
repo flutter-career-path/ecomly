@@ -40,6 +40,8 @@ productSchema.pre('save', async function (next) {
   next();
 });
 
+productSchema.index({ name: 'text', description: 'text' });
+
 
 productSchema.set('toJSON', { virtuals: true });
 productSchema.set('toObject', { virtuals: true });

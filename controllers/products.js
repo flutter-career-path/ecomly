@@ -77,10 +77,21 @@ exports.searchProducts = async (req, res) => {
     const page = req.query.page || 1;
     const pageSize = 10;
 
+    // const simpleTextSearch = name: {$regex: searchTerm, $options: 'i'};
+    // const indexedTextSearch = $text: {
+    //   $search: searchTerm,
+    //   $language: 'english', // Specify the language for stemming rules
+    //   $caseSensitive: false, // Make the search case-insensitive
+    // };
+
     let searchResults;
     if (req.query.category && !req.query.genderAgeCategory) {
       searchResults = await Product.find({
-        name: { $regex: searchTerm, $options: 'i' },
+        $text: {
+          $search: searchTerm,
+          $language: 'english', // Specify the language for stemming rules
+          $caseSensitive: false, // Make the search case-insensitive
+        },
         category: req.query.category,
       })
         .skip((page - 1) * pageSize)
@@ -89,7 +100,11 @@ exports.searchProducts = async (req, res) => {
       // i means case `i`nsensitive
       // when they choose 'All' from the front-end, the client will send no genderAgeCategory
       searchResults = await Product.find({
-        name: { $regex: searchTerm, $options: 'i' },
+        $text: {
+          $search: searchTerm,
+          $language: 'english', // Specify the language for stemming rules
+          $caseSensitive: false, // Make the search case-insensitive
+        },
         category: req.query.category,
         genderAgeCategory: req.query.genderAgeCategory.toLowerCase(),
       })
@@ -97,7 +112,11 @@ exports.searchProducts = async (req, res) => {
         .limit(pageSize);
     } else {
       searchResults = await Product.find({
-        name: { $regex: searchTerm, $options: 'i' },
+        $text: {
+          $search: searchTerm,
+          $language: 'english', // Specify the language for stemming rules
+          $caseSensitive: false, // Make the search case-insensitive
+        },
       })
         .skip((page - 1) * pageSize)
         .limit(pageSize);
