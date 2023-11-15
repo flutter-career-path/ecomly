@@ -9,6 +9,7 @@ const productSchema = Schema({
   image: { type: String, required: true },
   images: [{ type: String }],
   reviews: [{ type: Schema.Types.ObjectId, ref: 'Review' }],
+  numberOfReviews: { type: Number, default: 0 },
   sizes: [{ type: String }],
   category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
   genderAgeCategory: {
@@ -19,23 +20,23 @@ const productSchema = Schema({
   dateAdded: { type: Date, default: Date.now },
 });
 
-productSchema.virtual('numberOfReviews').get(() => {
-  if (this.reviews) {
-    return this.reviews.length;
-  }
-  return 0;
-});
-
 productSchema.pre('save', async function (next) {
   if (this.reviews.length > 0) {
+    // Populate the reviews to get the actual documents
+    await this.populate('reviews');
+
     const totalRating = this.reviews.reduce(
       (acc, review) => acc + review.rating,
       0
     );
+    console.log('Total Rating', totalRating);
     this.rating = totalRating / this.reviews.length;
+    console.log('Raw Average', this.rating);
 
     // Ensure the rating is between 0.0 and 5.0
-    this.rating = Math.max(0.0, Math.min(5.0, this.rating));
+    this.rating = parseFloat((totalRating / this.reviews.length).toFixed(1));
+    console.log('Final Rating', this.rating);
+    this.numberOfReviews = this.reviews.length;
   }
   next();
 });

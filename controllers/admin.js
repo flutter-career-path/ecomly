@@ -4,6 +4,7 @@ const { OrderItem } = require('../models/order_item');
 const { Order } = require('../models/order');
 const { Review } = require('../models/review');
 const { User } = require('../models/user');
+const { Token } = require('../models/token');
 const util = require('util');
 const media_helper = require('../helpers/media_helper');
 const { Product } = require('../models/product');
@@ -51,6 +52,8 @@ exports.deleteUser = async (req, res) => {
 
     // Remove all order items associated with the user
     await OrderItem.deleteMany({ _id: { $in: orderItemIds } });
+
+    await Token.deleteOne({ userId: userId });
 
     // Finally, remove the user
     const deletedUser = await User.deleteOne({ _id: userId });
