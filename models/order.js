@@ -9,7 +9,6 @@ const orderSchema = mongoose.Schema({
     },
   ],
   shippingAddress1: { type: String, required: true },
-  shippingAddress12: String,
   city: { type: String, required: true },
   zip: { type: String, required: true },
   country: { type: String, required: true },

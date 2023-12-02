@@ -42,7 +42,9 @@ exports.register = async function (req, res) {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email }).select('-wishlist -cart');
+    // we don't exclude the password hash here, because we will use it in the bcrypt.compareSync
+    // we will remove it after
+    const user = await User.findOne({ email }).select('-cart');
     if (!user) {
       return res
         .status(404)
@@ -80,9 +82,10 @@ exports.login = async (req, res) => {
 
 exports.verifyToken = async (req, res) => {
   try {
-    const accessToken = req.header('Authorization');
+    let accessToken = req.header('Authorization');
     if (!accessToken) return res.json(false);
-    const token = Token.findOne({ accessToken });
+    accessToken = accessToken.replace('Bearer', '').trim();
+    const token = await Token.findOne({ accessToken });
 
     if (!token) return res.json(false);
     const tokenData = jwt.decode(token.refreshToken);
@@ -212,7 +215,7 @@ exports.resetPassword = async (req, res) => {
 
     await user.save();
 
-    return res.status(200).json({ message: 'Password reset successful' });
+    return res.json({ message: 'Password reset successful' });
   } catch (error) {
     console.error('Reset Password error:', error);
     return res.status(500).json({ type: error.name, message: error.message });

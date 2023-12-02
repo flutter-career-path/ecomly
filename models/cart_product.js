@@ -7,4 +7,7 @@ const cartProductSchema = Schema({
   selectedColour: String,
 });
 
+cartProductSchema.set('toJSON', { virtuals: true });
+cartProductSchema.set('toObject', { virtuals: true });
+
 exports.CartProduct = model('CartProduct', cartProductSchema);

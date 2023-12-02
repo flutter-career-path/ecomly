@@ -1,4 +1,3 @@
-const express = require('express');
 const { Order } = require('../models/order');
 const { OrderItem } = require('../models/order_item');
 const { Product } = require('../models/product');
@@ -79,7 +78,9 @@ async function createOrderWithRetry(req, res, retries) {
       }
 
       product.countInStock -= orderItemModel.quantity;
+      console.log('SAVING ---- ', product.id);
       await product.save({ session });
+      console.log('DONE SAVING ---- ', product.id);
       orderItemsIds.push(orderItemModel._id);
     }
 

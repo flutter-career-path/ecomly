@@ -249,6 +249,7 @@ exports.addProduct = async (req, res) => {
     try {
       await imagesUpload(req, res);
     } catch (err) {
+      console.error(err);
       return res.status(500).json({
         type: err.code,
         message: `${err.message}{${err.field}}`,
