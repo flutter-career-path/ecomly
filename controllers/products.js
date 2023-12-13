@@ -105,6 +105,7 @@ exports.searchProducts = async (req, res) => {
           $language: 'english', // Specify the language for stemming rules
           $caseSensitive: false, // Make the search case-insensitive
         },
+        // you can add check to see if the genderAgeCategory is unisex and then make the search include both men and women
         category: req.query.category,
         genderAgeCategory: req.query.genderAgeCategory.toLowerCase(),
       })
