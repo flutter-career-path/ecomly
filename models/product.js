@@ -5,7 +5,7 @@ const productSchema = Schema({
   description: { type: String, required: true },
   price: { type: Number, required: true },
   rating: { type: Number, default: 0.0 },
-  colors: [{ type: String }],
+  colours: [{ type: String }],
   image: { type: String, required: true },
   images: [{ type: String }],
   reviews: [{ type: Schema.Types.ObjectId, ref: 'Review' }],

@@ -72,8 +72,26 @@ exports.deleteUser = async (req, res) => {
 
 exports.addCategory = async (req, res) => {
   try {
-    const { name, icon, colour } = req.body;
-    let category = new Category({ name: name, icon: icon, colour: colour });
+    const imageUpload = util.promisify(
+      media_helper.upload.fields([{ name: 'image', maxCount: 1 }])
+    );
+
+    try {
+      await imageUpload(req, res);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({
+        type: err.code,
+        message: `${err.message}{${err.field}}`,
+        storageErrors: err.storageErrors,
+      });
+    }
+
+    const image = req.files['image'][0];
+    if (!image) return res.status(404).json({ message: 'No file found' });
+    // this will fetch the filename from our setup at the top
+    req.body['image'] = `${req.protocol}://${req.get('host')}/${image.path}`;
+    let category = new Category(req.body);
 
     category = await category.save();
     if (!category)

@@ -82,23 +82,27 @@ exports.login = async (req, res) => {
 
 exports.verifyToken = async (req, res) => {
   try {
+    console.log('TOKEN VERIFICATION');
     let accessToken = req.header('Authorization');
+    console.log('ACCESS TOKEN', accessToken);
     if (!accessToken) return res.json(false);
     accessToken = accessToken.replace('Bearer', '').trim();
     const token = await Token.findOne({ accessToken });
-
+    console.info('TOKEN: ', token);
     if (!token) return res.json(false);
+    console.log('ACCESS TOKEN EXISTS');
     const tokenData = jwt.decode(token.refreshToken);
 
     const user = await User.findById(tokenData.id);
     if (!user) return res.json(false);
+    console.log('USER EXISTS');
 
     const isValid = jwt.verify(
       token.refreshToken,
       process.env.REFRESH_TOKEN_SECRET
     );
     if (!isValid) return res.json(false);
-
+    console.log('TOKEN IS STILL VALID');
     return res.json(true);
   } catch (err) {
     return res.status(500).json({ message: err.message });
@@ -170,7 +174,7 @@ exports.verifyPasswordResetOTP = async (req, res) => {
 
     // Check if the OTP and its expiration time are valid
     if (
-      user.resetPasswordOtp !== otp ||
+      user.resetPasswordOtp !== +otp ||
       Date.now() > user.resetPasswordOtpExpires
     ) {
       return res.status(401).json({ message: 'Invalid or expired OTP' });
