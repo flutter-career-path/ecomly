@@ -36,7 +36,7 @@ async function errorHandler(error, req, res, next) {
         {
           expiresIn: '24h', // Adjust the expiration time as needed
         }
-      );
+      ); 
       // Attach the new access token to the request headers
       req.headers['Authorization'] = `Bearer ${newAccessToken}`;
 
