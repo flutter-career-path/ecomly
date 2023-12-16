@@ -70,14 +70,18 @@ exports.getProductReviews = async function (req, res) {
             .sort({ date: -1 })
             .skip((page - 1) * pageSize)
             .limit(pageSize - (userReviews.length ?? 0))
-        : [];
+        : userReviews;
 
     // Concatenate user's reviews with the remaining reviews
-    const allReviews =
-      page === 1 ? [...userReviews, ...remainingReviews] : remainingReviews;
+    let allReviews = [];
+    if (remainingReviews.length > 0) {
+      allReviews = remainingReviews;
+    } else if (userReviews.length > 0) {
+      allReviews = userReviews;
+    }
 
     console.log(userReviews?.length);
-    console.log(allReviews.length);
+    console.log(allReviews.length); 
 
     const processedReviews = [];
     for (const review of allReviews) {

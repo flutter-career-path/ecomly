@@ -8,4 +8,7 @@ const reviewSchema = Schema({
   date: { type: Date, default: Date.now },
 });
 
+reviewSchema.set('toJSON', { virtuals: true });
+reviewSchema.set('toObject', { virtuals: true });
+
 exports.Review = model('Review', reviewSchema);

@@ -83,15 +83,19 @@ exports.login = async (req, res) => {
 exports.verifyToken = async (req, res) => {
   try {
     let accessToken = req.header('Authorization');
+    console.info('VERIFY TOKEN: ', accessToken);
     if (!accessToken) return res.json(false);
     accessToken = accessToken.replace('Bearer', '').trim();
     const token = await Token.findOne({ accessToken });
     if (!token) return res.json(false);
+
+    console.log('FOUND TOKEN IN DB', token.accessToken);
     const tokenData = jwt.decode(token.refreshToken);
 
     const user = await User.findById(tokenData.id);
     if (!user) return res.json(false);
 
+    console.log('USER FOUND');
     const isValid = jwt.verify(
       token.refreshToken,
       process.env.REFRESH_TOKEN_SECRET

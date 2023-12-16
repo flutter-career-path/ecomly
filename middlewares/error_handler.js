@@ -13,7 +13,9 @@ async function errorHandler(error, req, res, next) {
       });
     }
     try {
+      console.log('TRYING TO REFRESH TOKEN');
       const tokenHeader = req.header('Authorization');
+      console.info('EXPIRED TOKEN: ', tokenHeader);
       const authToken = tokenHeader?.split(' ')[1];
       let token = await Token.findOne({
         accessToken: authToken,
@@ -36,7 +38,9 @@ async function errorHandler(error, req, res, next) {
         {
           expiresIn: '24h', // Adjust the expiration time as needed
         }
-      ); 
+      );
+
+      console.info('NEW TOKEN: ', newAccessToken);
       // Attach the new access token to the request headers
       req.headers['Authorization'] = `Bearer ${newAccessToken}`;
 
