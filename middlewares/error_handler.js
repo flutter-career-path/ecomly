@@ -42,7 +42,7 @@ async function errorHandler(error, req, res, next) {
 
       console.info('NEW TOKEN: ', newAccessToken);
       // Attach the new access token to the request headers
-      req.headers['Authorization'] = `Bearer ${newAccessToken}`;
+      req.headers['authorization'] = `Bearer ${newAccessToken}`;
 
       // After successfully renewing the access token, update it in the database
       await Token.updateOne(

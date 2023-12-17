@@ -82,7 +82,7 @@ exports.login = async (req, res) => {
 
 exports.verifyToken = async (req, res) => {
   try {
-    let accessToken = req.header('Authorization');
+    let accessToken = req.headers.authorization;
     console.info('VERIFY TOKEN: ', accessToken);
     if (!accessToken) return res.json(false);
     accessToken = accessToken.replace('Bearer', '').trim();
