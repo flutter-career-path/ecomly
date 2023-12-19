@@ -277,6 +277,14 @@ exports.addProduct = async (req, res) => {
 
     const category = await Category.findById(req.body.category);
     if (!category) return res.status(404).json({ message: 'Invalid Category' });
+    if (category.markedForDeletion) {
+      return res
+        .status(404)
+        .json({
+          message:
+            'Category marked for deletion, you cannot add products to this category',
+        });
+    }
     const image = req.files['image'][0];
     if (!image) return res.status(404).json({ message: 'No file found' });
     // this will fetch the filename from our setup at the top
