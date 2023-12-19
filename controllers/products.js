@@ -5,13 +5,9 @@ exports.getProducts = async (req, res) => {
     let products;
     const page = req.query.page || 1;
     const pageSize = 10;
-    if (req.query.category) {
-      // product name, price, description, image, colours, rating
-      products = await Product.find({ category: req.query.category })
-        .select('-images -reviews -sizes')
-        .skip((page - 1) * pageSize)
-        .limit(pageSize);
-    } else if (req.query.criteria) {
+    // we put criteria first because in some cases, there's criteria + category filter, and if we check for category alone first, it'll catch such a case, unless we
+    // req.query.category && !req.query.criteria...
+    if (req.query.criteria) {
       let query = {};
       if (req.query.category) {
         query['category'] = req.query.category;
@@ -37,6 +33,12 @@ exports.getProducts = async (req, res) => {
           break;
       }
       products = await Product.find(query)
+        .select('-images -reviews -sizes')
+        .skip((page - 1) * pageSize)
+        .limit(pageSize);
+    } else if (req.query.category) {
+      // product name, price, description, image, colours, rating
+      products = await Product.find({ category: req.query.category })
         .select('-images -reviews -sizes')
         .skip((page - 1) * pageSize)
         .limit(pageSize);
