@@ -13,19 +13,23 @@ exports.getProducts = async (req, res) => {
         .limit(pageSize);
     } else if (req.query.criteria) {
       let query = {};
-
+      if (req.query.category) {
+        query['category'] = req.query.category;
+      }
       switch (req.query.criteria) {
-        case 'newArrivals':
+        case 'newArrivals': {
           // Customize the date range based on your business logic
           const twoWeeksAgo = new Date();
           twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
-          query = { dateAdded: { $gte: twoWeeksAgo } };
+          query['dateAdded'] = { $gte: twoWeeksAgo };
+
           break;
+        }
 
         case 'popular':
           // Customize the popularity criteria based on your business logic
-          query = { rating: { $gte: 4.5 } };
+          query['rating'] = { $gte: 4.5 };
           break;
 
         default:
