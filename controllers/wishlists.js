@@ -4,11 +4,37 @@ const { default: mongoose } = require('mongoose');
 
 exports.getUserWishlist = async function (req, res) {
   try {
-    const user = await User.findById(req.params.id).populate('wishlist');
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    return res.json(user.wishlist);
+    const wishlist = [];
+    for (const wishProduct of user.wishlist) {
+      const product = await Product.findById(wishProduct.productId);
+      if (!product) {
+        wishlist.push({
+          ...wishProduct,
+          productExists: false,
+          productOutOfStock: false,
+        });
+      } else if (product.countInStock < 1) {
+        wishlist.push({
+          ...wishProduct,
+          productExists: true,
+          productOutOfStock: true,
+        });
+      } else {
+        wishlist.push({
+          productId: product._id,
+          productImage: product.image,
+          productPrice: product.price,
+          productName: product.name,
+          productExists: true,
+          productOutOfStock: false,
+        });
+      }
+    }
+    return res.json(wishlist);
   } catch (err) {
     console.error('ERROR OCCURRED: ', err);
     return res.status(500).json({ type: err.name, message: err.message });
@@ -42,6 +68,7 @@ exports.addToWishlist = async function (req, res) {
       productId: req.body.productId,
       productName: product.name,
       productImage: product.image,
+      productPrice: product.price,
     });
     await user.save();
     return res.status(200).end();

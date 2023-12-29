@@ -23,6 +23,7 @@ const userSchema = Schema({
       },
       productName: { type: String, required: true },
       productImage: { type: String, required: true },
+      productPrice: {type: Number, required: true},
     },
   ],
   cart: [{ type: Schema.Types.ObjectId, ref: 'CartProduct' }],
