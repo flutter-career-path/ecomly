@@ -179,7 +179,46 @@ exports.getCartProductById = async function (req, res) {
     if (!cartProduct) {
       return res.status(404).json({ message: 'Cart Product not found!.' });
     }
-    return res.json(cartProduct);
+    let cartProductData;
+    const product = await Product.findById(cartProduct.product);
+    // since I don't want the reserved and reservation expiry my only option here would be to manually input each field I want
+    const currentCartProductData = {
+      product: cartProduct.product,
+      quantity: cartProduct.quantity,
+      selectedSize: cartProduct.selectedSize,
+      selectedColour: cartProduct.selectedColour,
+      productName: cartProduct.productName,
+      productImage: cartProduct.productImage,
+      productPrice: cartProduct.productPrice,
+    };
+    if (!product) {
+      cartProductData = {
+        ...currentCartProductData,
+        productExists: false,
+        productOutOfStock: false,
+      };
+    } else {
+      currentCartProductData['productName'] = product.name;
+      currentCartProductData['productImage'] = product.image;
+      currentCartProductData['productPrice'] = product.price;
+      if (
+        !cartProduct.reserved &&
+        product.countInStock < cartProduct.quantity
+      ) {
+        cartProductData = {
+          ...currentCartProductData,
+          productExists: true,
+          productOutOfStock: true,
+        };
+      } else {
+        cartProductData = {
+          ...currentCartProductData,
+          productExists: true,
+          productOutOfStock: false,
+        };
+      }
+    }
+    return res.json(cartProductData);
   } catch (err) {
     return res.status(500).json({ type: err.name, message: err.message });
   }
