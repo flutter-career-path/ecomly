@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const { Product } = require('../models/product');
 const { Order } = require('../models/order');
 const { Category } = require('../models/category');
+const { CartProduct } = require('../models/cart_product');
 
 cron.schedule('0 0 * * *', async function () {
   try {
@@ -45,3 +46,60 @@ cron.schedule('0 0 * * *', async function () {
     console.error('CRON job error:', error);
   }
 });
+
+cron.schedule('*/30 * * * *', async function () {
+  const session = await CartProduct.startSession();
+  session.startTransaction();
+
+  try {
+    console.log('Reservation Release CRON job started at', new Date());
+
+    const expiredReservations = await CartProduct.find({
+      reserved: true,
+      reservationExpiry: { $lte: new Date() },
+    }).session(session);
+
+    for (const cartProduct of expiredReservations) {
+      const product = await Product.findById(cartProduct.product).session(
+        session
+      );
+
+      if (product) {
+        // Implement optimistic concurrency control
+        const updatedProduct = await Product.findByIdAndUpdate(
+          product._id,
+          {
+            $inc: { countInStock: cartProduct.quantity },
+          },
+          { new: true, runValidators: true, session }
+        );
+
+        if (!updatedProduct) {
+          // Transaction failed, abort the operation
+          console.error('Product update failed. Potential concurrency issue.');
+          await session.abortTransaction();
+          session.endSession();
+          return;
+        }
+      }
+
+      // Update the reserved status and remove the cart product
+      await CartProduct.findByIdAndUpdate(
+        cartProduct._id,
+        { reserved: false },
+        { session }
+      );
+    }
+
+    // If all updates are successful, commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+
+    console.log('Reservation Release CRON job completed at', new Date());
+  } catch (error) {
+    console.error('Reservation Release CRON job error:', error);
+    await session.abortTransaction();
+    session.endSession();
+  }
+});
+

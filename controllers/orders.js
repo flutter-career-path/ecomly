@@ -164,11 +164,6 @@ exports.getUserOrders = async (req, res) => {
 
 exports.getOrderById = async (req, res) => {
   try {
-    if (req.params.id.toLowerCase() === 'count') {
-      return res
-        .status(403)
-        .json({ message: 'This is an admin route. Access forbidden' });
-    }
     const order = await Order.findById(req.params.id)
       .select('-statusHistory')
       .populate('user', 'name email')

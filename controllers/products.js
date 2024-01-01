@@ -59,11 +59,6 @@ exports.getProducts = async (req, res) => {
 
 exports.getProductById = async (req, res) => {
   try {
-    if (req.params.id.toLowerCase() === 'count') {
-      return res
-        .status(403)
-        .json({ message: 'This is an admin route. Access Forbidden.' });
-    }
     const product = await Product.findById(req.params.id).select('-reviews');
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
