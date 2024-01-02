@@ -18,6 +18,7 @@ exports.getUserCart = async function (req, res) {
     for (const cartProduct of cartProducts) {
       const product = await Product.findById(cartProduct.product);
       const currentCartProductData = {
+        id: cartProduct._id,
         product: cartProduct.product,
         quantity: cartProduct.quantity,
         selectedSize: cartProduct.selectedSize,
@@ -67,7 +68,7 @@ exports.getUserCartCount = async function (req, res) {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    return res.json({ cartCount: user.cart.length });
+    return res.json(user.cart.length);
   } catch (err) {
     console.log('ERROR OCCURRED: ', err);
     return res.status(500).json({ type: err.name, message: err.message });
@@ -172,7 +173,6 @@ exports.modifyProductQuantity = async function (req, res) {
   }
 };
 
-
 exports.getCartProductById = async function (req, res) {
   try {
     const cartProduct = await CartProduct.findById(req.params.cartProductId);
@@ -183,6 +183,7 @@ exports.getCartProductById = async function (req, res) {
     const product = await Product.findById(cartProduct.product);
     // since I don't want the reserved and reservation expiry my only option here would be to manually input each field I want
     const currentCartProductData = {
+      id: cartProduct._id,
       product: cartProduct.product,
       quantity: cartProduct.quantity,
       selectedSize: cartProduct.selectedSize,
