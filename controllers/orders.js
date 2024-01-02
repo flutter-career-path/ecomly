@@ -3,6 +3,7 @@ const { OrderItem } = require('../models/order_item');
 const { Product } = require('../models/product');
 const mongoose = require('mongoose');
 const { User } = require('../models/user');
+const { CartProduct } = require('../models/cart_product');
 
 const MAX_RETRIES = 3;
 
@@ -50,6 +51,14 @@ async function createOrderWithRetry(req, res, retries) {
           message: 'Invalid product in the order',
         });
       }
+      const cartProduct = await CartProduct.findById(orderItem.cartProductId);
+      if (!cartProduct) {
+        await session.abortTransaction();
+        await session.endSession();
+        return res.status(400).json({
+          message: 'Invalid product in the order',
+        });
+      }
       let orderItemModel = new OrderItem(orderItem);
       const product = await Product.findById(orderItem.product);
       orderItemModel.productPrice = product.price;
@@ -77,11 +86,20 @@ async function createOrderWithRetry(req, res, retries) {
         return handleConflict(req, res, session, retries);
       }
 
-      product.countInStock -= orderItemModel.quantity;
-      console.log('SAVING ---- ', product.id);
-      await product.save({ session });
-      console.log('DONE SAVING ---- ', product.id);
+      if (!cartProduct.reserved) {
+        product.countInStock -= orderItemModel.quantity;
+        console.log('SAVING ---- ', product.id);
+        await product.save({ session });
+        console.log('DONE SAVING ---- ', product.id);
+      }
       orderItemsIds.push(orderItemModel._id);
+
+      // Remove the CartProduct after processing the orderItem within the same session
+      await CartProduct.findByIdAndDelete(orderItem.cartProductId).session(
+        session
+      );
+      user.cart.pull(cartProduct.id);
+      await user.save({ session });
     }
 
     req.body['orderItems'] = orderItemsIds;
