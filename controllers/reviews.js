@@ -2,6 +2,7 @@ const { Review } = require('../models/review');
 const { Product } = require('../models/product');
 const { User } = require('../models/user');
 const jwt = require('jsonwebtoken');
+const { default: mongoose } = require('mongoose');
 
 exports.leaveReview = async function (req, res) {
   try {
@@ -34,6 +35,8 @@ exports.leaveReview = async function (req, res) {
 };
 
 exports.getProductReviews = async function (req, res) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
@@ -46,45 +49,29 @@ exports.getProductReviews = async function (req, res) {
       .replace('Bearer', '')
       .trim();
     const tokenData = jwt.decode(accessToken);
-
-    // Fetch user's reviews separately
-    const userReviews = await Review.find({
-      _id: { $in: product.reviews },
-      user: tokenData.id,
-    })
-      .sort({ date: -1 })
-      .skip((page - 1) * pageSize)
-      .limit(pageSize);
-
-    // Fetch remaining reviews for pagination
-    const remainingReviews =
-      (userReviews && userReviews.length < pageSize) || !userReviews
-        ? await Review.find({
-            _id: {
-              $in: product.reviews,
-              ...(userReviews && {
-                $nin: userReviews.map((review) => review.id),
-              }),
-            },
-          })
-            .sort({ date: -1 })
-            .skip((page - 1) * pageSize)
-            .limit(pageSize - (userReviews.length ?? 0))
-        : userReviews;
-
-    // Concatenate user's reviews with the remaining reviews
-    let allReviews = [];
-    if (remainingReviews.length > 0) {
-      allReviews = remainingReviews;
-    } else if (userReviews.length > 0) {
-      allReviews = userReviews;
-    }
-
-    console.log(userReviews?.length);
-    console.log(allReviews.length); 
-
+    const reviews = await Review.aggregate([
+      {
+        $match: {
+          _id: { $in: product.reviews },
+        },
+      },
+      {
+        $addFields: {
+          sortId: {
+            $cond: [
+              { $eq: ['$user', new mongoose.Types.ObjectId(tokenData.id)] },
+              0,
+              1,
+            ],
+          },
+        },
+      },
+      { $sort: { sortId: 1, date: -1 } },
+      { $skip: (page - 1) * pageSize },
+      { $limit: pageSize },
+    ]);
     const processedReviews = [];
-    for (const review of allReviews) {
+    for (const review of reviews) {
       const user = await User.findById(review.user);
       if (!user) {
         processedReviews.push(review);
@@ -93,14 +80,57 @@ exports.getProductReviews = async function (req, res) {
       let newReview;
       if (review.userName !== user.name) {
         review.userName = user.name;
-        newReview = await review.save();
+        newReview = await review.save({ session });
       }
       processedReviews.push(newReview ?? review);
     }
+    await session.commitTransaction();
     return res.json(processedReviews);
   } catch (err) {
     console.log('ERROR OCCURRED: ', err);
+    await session.abortTransaction();
     return res.status(500).json({ type: err.name, message: err.message });
+  } finally {
+    await session.endSession();
   }
 };
+  
+
+// Minimalistic approach with some hiccups as it does the filtering and prioritization in memory as opposed to using database queries
+
+// exports.getProductReviews = async function (req, res) {
+//   const productId = req.params.id;
+//   const { page = 1 } = req.query;
+//   const limit = 10; // Adjust as needed
+//   const skip = (page - 1) * limit;
+
+//   const accessToken = req.header('Authorization').replace('Bearer', '').trim();
+//   const tokenData = jwt.decode(accessToken);
+//   const userId = tokenData.id;
+
+//   try {
+//     const product = await Product.findById(productId).populate('reviews');
+
+//     if (!product) {
+//       res.status(404).json({ message: 'Product not found' });
+//       return;
+//     }
+
+//     // Prioritize user's reviews using $or and $sort
+//     const userReviews = product.reviews.filter(
+//       (review) => review.user.toString() === userId
+//     );
+//     const otherReviews = product.reviews.filter(
+//       (review) => review.user.toString() !== userId
+//     );
+//     const allReviews = [...userReviews, ...otherReviews];
+
+//     const paginatedReviews = allReviews.slice(skip, skip + limit);
+
+//     res.json(paginatedReviews);
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: 'Error fetching reviews' });
+//   }
+// };
   
