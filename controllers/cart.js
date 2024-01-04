@@ -16,7 +16,6 @@ exports.getUserCart = async function (req, res) {
     }
     const cart = [];
     for (const cartProduct of cartProducts) {
-      console.log(cartProduct);
       const product = await Product.findById(cartProduct.product);
       const currentCartProductData = {
         id: cartProduct._id,
