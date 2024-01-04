@@ -16,6 +16,7 @@ exports.getUserCart = async function (req, res) {
     }
     const cart = [];
     for (const cartProduct of cartProducts) {
+      console.log(cartProduct);
       const product = await Product.findById(cartProduct.product);
       const currentCartProductData = {
         id: cartProduct._id,
@@ -76,6 +77,8 @@ exports.getUserCartCount = async function (req, res) {
 };
 
 exports.addToCart = async function (req, res) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const { productId } = req.body;
     const user = await User.findById(req.params.id);
@@ -98,10 +101,26 @@ exports.addToCart = async function (req, res) {
     );
 
     if (existingCartItem) {
-      // If the same product with the same size and colour exists, increment the quantity
-      existingCartItem.quantity += 1;
-      await existingCartItem.save();
-      return res.status(200).end();
+      // Retrieve the original product
+      const product = await Product.findById(productId).session(session);
+
+      // Check for sufficient stock
+      if (product.countInStock >= existingCartItem.quantity + 1) {
+        existingCartItem.quantity += 1;
+        await existingCartItem.save({ session });
+
+        // Update product stock
+        await Product.findOneAndUpdate(
+          { _id: productId },
+          { $inc: { countInStock: -1 } }
+        ).session(session);
+        await session.commitTransaction();
+        return res.status(200).end();
+      } else {
+        // Handle insufficient stock
+        session.abortTransaction();
+        return res.status(400).json({ message: 'Out of stock!' });
+      }
     }
 
     // If not, create a new CartProduct
@@ -115,41 +134,41 @@ exports.addToCart = async function (req, res) {
       productName: product.name,
       productImage: product.image,
       productPrice: product.price,
-    }).save();
+      reserved: true,
+    }).save({ session });
 
     if (!cartProduct) {
+      session.abortTransaction();
       return res
         .status(500)
         .json({ message: 'The Product could not be added to your cart' });
     }
 
     user.cart.push(cartProduct.id);
-    await user.save();
+    await user.save({ session });
 
-    // Deduct from countInStock and save, handling concurrency
+    // Deduct from countInStock and save (transaction should handle concurrency)
     const updatedProduct = await Product.findOneAndUpdate(
       { _id: productId, countInStock: { $gte: cartProduct.quantity } },
       { $inc: { countInStock: -cartProduct.quantity } },
-      { new: true } // Return the updated document
+      { new: true, session } // Use session here
     );
 
     if (!updatedProduct) {
       // Handle insufficient stock or concurrency issues
-      // Delete the newly created cart product from the database
-      await CartProduct.findByIdAndDelete(cartProduct.id);
-
-      // Rollback changes in user cart
-      user.cart.pull(cartProduct.id);
-      await user.save();
-
+      session.abortTransaction();
       return res
         .status(400)
         .json({ message: 'Insufficient stock or concurrency issue' });
     }
+    await session.commitTransaction();
     return res.status(201).json(cartProduct);
   } catch (err) {
     console.log('ERROR OCCURRED: ', err);
+    await session.abortTransaction();
     return res.status(500).json({ type: err.name, message: err.message });
+  } finally {
+    await session.endSession();
   }
 };
 
@@ -158,7 +177,25 @@ exports.modifyProductQuantity = async function (req, res) {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    const cartProduct = await CartProduct.findByIdAndUpdate(
+    const { quantity } = req.body;
+    let cartProduct = await CartProduct.findById(req.params.cartProductId);
+    if (!cartProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const actualProduct = await Product.findById(cartProduct.product);
+
+    if (!actualProduct) {
+      return res.status(404).json({ message: 'Product does not exist' });
+    }
+
+    if (quantity > actualProduct.countInStock) {
+      return res
+        .status(400)
+        .json({ message: 'Insufficient stock for the requested quantity' });
+    }
+
+    cartProduct = await CartProduct.findByIdAndUpdate(
       req.params.cartProductId,
       req.body,
       { new: true }
@@ -227,7 +264,6 @@ exports.getCartProductById = async function (req, res) {
 
 exports.removeFromCart = async function (req, res) {
   try {
-    const { productId } = req.body;
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ message: 'User not found' });
 
@@ -235,24 +271,30 @@ exports.removeFromCart = async function (req, res) {
       return res.status(400).json({ message: 'Product not in user cart' });
     }
     // Find the cart item to be removed
-    const cartItemToRemove = CartProduct.findById(req.params.cartProductId);
+    const cartItemToRemove = await CartProduct.findById(
+      req.params.cartProductId
+    );
 
     if (!cartItemToRemove) {
       // If the cart item doesn't exist, return a 404 status
       return res.status(404).json({ message: 'Cart item not found' });
     }
 
-    // Increment countInStock and save, handling concurrency
-    const updatedProduct = await Product.findOneAndUpdate(
-      { _id: productId },
-      { $inc: { countInStock: cartItemToRemove.quantity } },
-      { new: true } // Return the updated document
-    );
+    if (cartItemToRemove.reserved) {
+      // Increment countInStock and save, handling concurrency
+      const updatedProduct = await Product.findOneAndUpdate(
+        { _id: cartItemToRemove.product },
+        { $inc: { countInStock: cartItemToRemove.quantity } },
+        { new: true } // Return the updated document
+      );
 
-    if (!updatedProduct) {
-      console.error('Failed to update product stock due to concurrency issues');
-      // Handle concurrency issues
-      return res.status(500).json({ message: 'Internal Server Error' });
+      if (!updatedProduct) {
+        console.error(
+          'Failed to update product stock due to concurrency issues'
+        );
+        // Handle concurrency issues
+        return res.status(500).json({ message: 'Internal Server Error' });
+      }
     }
 
     // Remove the cart item from the user's cart
@@ -260,9 +302,13 @@ exports.removeFromCart = async function (req, res) {
     await user.save();
 
     // Remove the cart item from the database
-    await CartProduct.findByIdAndDelete(cartItemToRemove.id);
-
-    return res.status(200).json({ message: 'Cart item removed successfully' });
+    const cartProduct = await CartProduct.findByIdAndDelete(
+      cartItemToRemove.id
+    );
+    if (!cartProduct) {
+      return res.status(404).json({ message: 'Item not found' });
+    }
+    return res.status(204).json({ message: 'Cart item removed successfully' });
   } catch (err) {
     console.error('ERROR OCCURRED: ', err);
     return res.status(500).json({ type: err.name, message: err.message });
