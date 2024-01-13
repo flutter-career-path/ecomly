@@ -31,6 +31,7 @@ const ordersRouter = require('./routes/orders');
 const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
+const checkoutRouter = require('./routes/checkout');
 
 const API = env.API_URL;
 
@@ -39,6 +40,7 @@ app.use(`${API}/categories`, categoriesRouter);
 app.use(`${API}/orders`, ordersRouter);
 app.use(`${API}/users`, usersRouter);
 app.use(`${API}/`, authRouter);
+app.use(`${API}/checkout`, checkoutRouter);
 app.use(`${API}/admin`, adminRouter);
 app.use('/public', express.static(__dirname + '/public'));
 
