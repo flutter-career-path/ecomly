@@ -7,11 +7,11 @@ const { CartProduct } = require('../models/cart_product');
 
 const MAX_RETRIES = 3;
 
-async function handleConflict(req, res, session, retries) {
+async function handleConflict(orderData, res, session, retries) {
   if (retries < MAX_RETRIES) {
     // Handle the conflict, wait a moment, and retry
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for a second
-    return createOrderWithRetry(req, res, retries + 1);
+    return createOrderWithRetry(orderData, res, retries + 1);
   } else {
     // Maximum retries reached, handle it as you see fit
     await session.abortTransaction();
@@ -22,23 +22,23 @@ async function handleConflict(req, res, session, retries) {
   }
 }
 
-async function createOrderWithRetry(req, res, retries) {
+async function createOrderWithRetry(orderData, res, retries) {
   retries = retries ?? 0;
-  if (!mongoose.isValidObjectId(req.body.user)) {
+  if (!mongoose.isValidObjectId(orderData.user)) {
     return res.status(500).json({ message: 'Invalid user!' });
   }
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const user = await User.findById(req.body.user);
+    const user = await User.findById(orderData.user);
     if (!user) {
       await session.abortTransaction();
       await session.endSession();
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const orderItems = req.body.orderItems;
+    const orderItems = orderData.orderItems;
     const orderItemsIds = [];
     for (const orderItem of orderItems) {
       if (
@@ -61,10 +61,6 @@ async function createOrderWithRetry(req, res, retries) {
       }
       let orderItemModel = new OrderItem(orderItem);
       const product = await Product.findById(orderItem.product);
-      orderItemModel.productPrice = product.price;
-      orderItemModel.productName = product.name;
-      orderItemModel.productImage = product.image;
-      orderItemModel = await orderItemModel.save({ session });
       if (!orderItemModel || product.countInStock < orderItemModel.quantity) {
         await session.abortTransaction();
         await session.endSession();
@@ -83,7 +79,7 @@ async function createOrderWithRetry(req, res, retries) {
       if (updatedProduct.countInStock !== product.countInStock) {
         await session.abortTransaction();
         await session.endSession();
-        return handleConflict(req, res, session, retries);
+        return handleConflict(orderData, res, session, retries);
       }
 
       if (!cartProduct.reserved) {
@@ -102,9 +98,9 @@ async function createOrderWithRetry(req, res, retries) {
       await user.save({ session });
     }
 
-    req.body['orderItems'] = orderItemsIds;
+    orderData['orderItems'] = orderItemsIds;
 
-    return await addOrder(session, req, res);
+    return await addOrder(session, orderData, res);
   } catch (err) {
     await session.abortTransaction();
     await session.endSession();
@@ -113,12 +109,12 @@ async function createOrderWithRetry(req, res, retries) {
   }
 }
 
-async function addOrder(session, req, res) {
-  req.body['totalPrice'] = await resolveOrderTotal(
-    req.body.orderItems,
+async function addOrder(session, orderData, res) {
+  orderData['totalPrice'] = await resolveOrderTotal(
+    orderData.orderItems,
     session
   );
-  const order = await new Order(req.body).save({ session });
+  const order = await new Order(orderData).save({ session });
 
   if (!order) {
     await session.abortTransaction();
@@ -143,8 +139,8 @@ async function resolveOrderTotal(orderItemsIds, session) {
   return totalPrices.reduce((a, b) => a + b, 0);
 }
 
-exports.addOrder = async (req, res) => {
-  await createOrderWithRetry(req, res, 0);
+exports.addOrder = async (orderData, res) => {
+  await createOrderWithRetry(orderData, res, 0);
 };
 
 exports.getUserOrders = async (req, res) => {
