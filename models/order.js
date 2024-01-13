@@ -13,6 +13,7 @@ const orderSchema = mongoose.Schema({
   zip: { type: String, required: true },
   country: { type: String, required: true },
   phone: { type: String, required: true },
+  paymentId: String,
   status: {
     type: String,
     enum: [
