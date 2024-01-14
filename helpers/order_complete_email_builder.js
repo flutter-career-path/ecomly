@@ -1,4 +1,4 @@
-exports.buildEmail = (userName, order, shippingDetailsUsername) {
+exports.buildEmail = (userName, order, shippingDetailsUsername) => {
   const orderTemplates = [];
   for (const orderItem of order.orderItems) {
     orderTemplates.push(
@@ -532,7 +532,7 @@ exports.buildEmail = (userName, order, shippingDetailsUsername) {
      </body>
     </html>
     `;
-}
+};
 
 function orderItemTemplate(
   itemImage,
