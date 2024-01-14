@@ -114,13 +114,19 @@ async function addOrder(session, orderData, res) {
     orderData.orderItems,
     session
   );
-  const order = await new Order(orderData).save({ session });
+  let order = new Order(orderData);
+  order.status = 'processed';
+  order.statusHistory.push('processed');
+  await order.save();
+
+  order = await order.save({ session });
 
   if (!order) {
     await session.abortTransaction();
     await session.endSession();
     return res.status(500).json({ message: 'The order could not be created' });
   }
+
   await session.commitTransaction();
   await session.endSession();
 
