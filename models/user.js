@@ -12,7 +12,7 @@ const userSchema = Schema({
   street: String,
   apartment: String,
   city: String,
-  zip: String,
+  postalCode: String,
   country: String,
   phone: { type: String, required: true, trim: true },
   wishlist: [
