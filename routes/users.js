@@ -9,6 +9,8 @@ router.get('/', usersController.getUsers);
 
 router.get('/:id', usersController.getUserById);
 
+router.get('/:id/paymentProfile', usersController.getPaymentProfile);
+
 router.put('/:id', usersController.updateUser);
 
 router.get('/:id/wishlist', wishlistController.getUserWishlist);
