@@ -109,7 +109,7 @@ exports.webhook = (req, res) => {
             cartProductId: item.cartProductId,
             productPrice: item.price,
             productName: item.name,
-            productImage: item.productImage,
+            productImage: item.images[0],
             selectedSize: item.selectedSize ?? undefined,
             selectedColour: item.selectedColour ?? undefined,
           };
