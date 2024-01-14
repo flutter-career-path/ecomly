@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User } = require('../models/user');
 const { Token } = require('../models/token');
-const nodemailer = require('nodemailer');
+const mailSender = require('../helpers/email_sender');
 
 const { validationResult } = require('express-validator'); // Import express-validator
 
@@ -131,29 +131,12 @@ exports.forgotPassword = async (req, res) => {
     await user.save();
 
     // Send an email with the OTP
-    const transporter = nodemailer.createTransport({
-      service: 'Gmail', // Use your email service provider
-      auth: {
-        user: process.env.EMAIL, // Your email address
-        pass: process.env.EMAIL_PASSWORD, // Your email password
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL,
-      to: email,
-      subject: 'Password Reset OTP',
-      text: `Your OTP for password reset is: ${otp}`,
-    };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error('Error sending email:', error);
-        return res.status(500).json({ message: 'Error sending email' });
-      }
-      console.log('Email sent:', info.response);
-      return res.json({ message: 'Password reset OTP sent to your email' });
-    });
+    return mailSender.sendMail(
+      'Password Reset OTP',
+      `Your OTP for password reset is: ${otp}`,
+      'Password reset OTP sent to your email',
+      'Error sending email'
+    );
   } catch (error) {
     console.error('Reset Password error:', error);
     return res.status(500).json({ type: error.name, message: error.message });
