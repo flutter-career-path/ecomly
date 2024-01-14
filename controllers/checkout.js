@@ -25,25 +25,41 @@ exports.checkout = async (req, res) => {
     });
     customerId = customer.id;
   }
+  const theme = req.query.theme;
+  const isDarkMode = theme.toLowerCase() === 'dark';
   const session = await stripe.checkout.sessions.create({
-    line_items: [
-      {
+    line_items: req.body.cartItems.map((item) => {
+      return {
         price_data: {
           currency: 'usd',
           product_data: {
-            name: 'T-shirt',
-            // images: [],
+            name: item.name,
+            images: item.images,
             // description:
-            // metadata
+            metadata: {
+              selectedSize: item.selectedSize,
+              selectedColour: item.selectedColour,
+            },
           },
-          unit_amount: 2000, // x 100
+          unit_amount: item.price * 100,
         },
-        quantity: 1,
-      },
-    ],
+        quantity: item.quantity,
+      };
+    }),
+    billing_address_collection: 'auto',
+    // allowed_countries
+    shipping_address_collection: {},
     phone_number_collection: { enabled: true },
     customer: customerId,
     mode: 'payment',
+    appearance: {
+      theme: isDarkMode ? 'night' : 'stripe',
+      variables: {
+        colorPrimary: '#524eb7',
+        colorBackground: isDarkMode ? '#0e0d11' : '#f6f6f9',
+        colorText: isDarkMode ? '#ffffff' : '#282344',
+      },
+    },
     success_url: 'https://dbestech.biz/payment-success',
     cancel_url: 'https://dbestech.biz/cart',
   });
@@ -66,15 +82,19 @@ exports.webhook = (req, res) => {
     return;
   }
 
-  const accessToken = req.header('Authorization').replace('Bearer', '').trim();
-  const tokenData = jwt.decode(accessToken);
-
   if (event.type === 'checkout.session.succeeded') {
-    const checkoutIntentSucceeded = event.data.object;
+    const session = event.data.object;
+
     stripe.customers
-      .retrieve(checkoutIntentSucceeded.customer)
-      .then((customer) => {
+      .retrieve(session.customer)
+      .then(async (customer) => {
         orderController.addOrder({}, res);
+        // session.payment_intent
+        await User.findByIdAndUpdate(
+          customer.metadata.userId,
+          { paymentCustomerId: session.customer },
+          { new: true }
+        );
         // send email
       })
       .catch((err) => console.log(err.message));
