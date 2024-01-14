@@ -7,6 +7,7 @@ const orderController = require('./orders');
 const mailSender = require('../helpers/email_sender');
 const { Product } = require('../models/product');
 const mailBuilder = require('../helpers/order_complete_email_builder');
+const jwt = require('jsonwebtoken');
 
 exports.checkout = async (req, res) => {
   const accessToken = req.header('Authorization').replace('Bearer', '').trim();
