@@ -35,7 +35,7 @@ exports.checkout = async (req, res) => {
     const customer = await stripe.customers.create({
       metadata: {
         userId: tokenData.id,
-        cart: JSON.stringify(req.body.cartItems),
+        cart: JSON.stringify(req.body.cartItems.toString()),
       },
     });
     customerId = customer.id;
@@ -67,19 +67,19 @@ exports.checkout = async (req, res) => {
     phone_number_collection: { enabled: true },
     customer: customerId,
     mode: 'payment',
-    appearance: {
-      theme: isDarkMode ? 'night' : 'stripe',
-      variables: {
-        colorPrimary: '#524eb7',
-        colorBackground: isDarkMode ? '#0e0d11' : '#f6f6f9',
-        colorText: isDarkMode ? '#ffffff' : '#282344',
-      },
-    },
+    // appearance: {
+    //   theme: isDarkMode ? 'night' : 'stripe',
+    //   variables: {
+    //     colorPrimary: '#524eb7',
+    //     colorBackground: isDarkMode ? '#0e0d11' : '#f6f6f9',
+    //     colorText: isDarkMode ? '#ffffff' : '#282344',
+    //   },
+    // },
     success_url: 'https://dbestech.biz/payment-success',
     cancel_url: 'https://dbestech.biz/cart',
   });
 
-  res.status(303).json({ url: session.url });
+  res.status(201).json({ url: session.url });
 };
 
 exports.webhook = (req, res) => {
