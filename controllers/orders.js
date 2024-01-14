@@ -202,3 +202,7 @@ exports.getOrderById = async (req, res) => {
     return res.status(500).json({ type: err.name, message: err.message });
   }
 };
+
+// you can implement this if you want and add a cron job to return their money or
+// have the admins do this manually, send a notification to the admin dashboard to return their money
+// exports.cancelOrder = async (req, res)
