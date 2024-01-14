@@ -37,8 +37,8 @@ exports.checkout = async (req, res) => {
             images: item.images,
             // description:
             metadata: {
-              selectedSize: item.selectedSize,
-              selectedColour: item.selectedColour,
+              selectedSize: item.selectedSize ?? undefined,
+              selectedColour: item.selectedColour ?? undefined,
             },
           },
           unit_amount: item.price * 100,
@@ -88,8 +88,34 @@ exports.webhook = (req, res) => {
     stripe.customers
       .retrieve(session.customer)
       .then(async (customer) => {
-        orderController.addOrder({}, res);
-        // session.payment_intent
+        const orderItems = JSON.parse(customer.metadata.cart).map((item) => {
+          return {
+            quantity: item.quantity,
+            product: item.product,
+            cartProductId: item.cartProductId,
+            productPrice: item.price,
+            productName: item.name,
+            productImage: item.productImage,
+            selectedSize: item.selectedSize ?? undefined,
+            selectedColour: item.selectedColour ?? undefined,
+          };
+        });
+        const address = session.customer_details.address;
+        orderController.addOrder(
+          {
+            orderItems: orderItems,
+            shippingAddress1:
+              address.line1 === 'N/A' ? address.line2 : address.line1,
+            city: address.city,
+            postalCode: address.postal_code,
+            country: address.country,
+            totalPrice: session.amount_total,
+            phone: session.customer_details.phone,
+            user: customer.metadata.userId,
+            paymentId: session.payment_intent,
+          },
+          res
+        );
         await User.findByIdAndUpdate(
           customer.metadata.userId,
           { paymentCustomerId: session.customer },
