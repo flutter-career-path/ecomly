@@ -6,6 +6,7 @@ const { User } = require('../models/user');
 const orderController = require('./orders');
 const mailSender = require('../helpers/email_sender');
 const { Product } = require('../models/product');
+const mailBuilder = require('../helpers/order_complete_email_builder');
 
 exports.checkout = async (req, res) => {
   const accessToken = req.header('Authorization').replace('Bearer', '').trim();
@@ -114,7 +115,7 @@ exports.webhook = (req, res) => {
           };
         });
         const address = session.customer_details.address;
-        orderController.addOrder(
+        const order = await orderController.addOrder(
           {
             orderItems: orderItems,
             shippingAddress1:
@@ -129,13 +130,20 @@ exports.webhook = (req, res) => {
           },
           res
         );
-        await User.findByIdAndUpdate(
+        const user = await User.findByIdAndUpdate(
           customer.metadata.userId,
           { paymentCustomerId: session.customer },
           { new: true }
         );
         // send email
-        mailSender.sendMail('Your Ecomly order');
+        await mailSender.sendMail(
+          'Your Ecomly order',
+          mailBuilder.buildEmail(
+            user.name,
+            order,
+            session.customer_details.name
+          )
+        );
       })
       .catch((err) => console.log(err.message));
   } else {
