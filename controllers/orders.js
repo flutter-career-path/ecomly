@@ -16,9 +16,9 @@ async function handleConflict(orderData, res, session, retries) {
     // Maximum retries reached, handle it as you see fit
     await session.abortTransaction();
     await session.endSession();
-    return res
-      .status(409)
-      .json({ message: 'Order conflict, please try again later' });
+    return console.error(
+      'ORDER CREATION FAILED: Order conflict, please try again later'
+    );
   }
 }
 
@@ -35,7 +35,7 @@ async function createOrderWithRetry(orderData, res, retries) {
     if (!user) {
       await session.abortTransaction();
       await session.endSession();
-      return res.status(404).json({ message: 'User not found' });
+      return console.error('ORDER CREATION FAILED: User not found');
     }
 
     const orderItems = orderData.orderItems;
@@ -47,38 +47,25 @@ async function createOrderWithRetry(orderData, res, retries) {
       ) {
         await session.abortTransaction();
         await session.endSession();
-        return res.status(400).json({
-          message: 'Invalid product in the order',
-        });
+        return console.error(
+          'ORDER CREATION FAILED: Invalid product in the order'
+        );
       }
       const cartProduct = await CartProduct.findById(orderItem.cartProductId);
       if (!cartProduct) {
         await session.abortTransaction();
         await session.endSession();
-        return res.status(400).json({
-          message: 'Invalid product in the order',
-        });
+        return console.error(
+          'ORDER CREATION FAILED: Invalid product in the order'
+        );
       }
       let orderItemModel = new OrderItem(orderItem);
       const product = await Product.findById(orderItem.product);
-      if (!orderItemModel || product.countInStock < orderItemModel.quantity) {
+      if (!orderItemModel) {
         await session.abortTransaction();
         await session.endSession();
-        let message = `An order for product ${product.name} could not be created`;
-        if (product.countInStock < orderItemModel.quantity) {
-          if (product.countInStock == 0) {
-            message += '\nOut of stock';
-          } else {
-            message += `\nOrder for ${orderItemModel.quantity}, but only ${product.countInStock} left in stock`;
-          }
-        }
-        return res.status(500).json({ message });
-      }
-
-      const updatedProduct = await Product.findById(orderItem.product);
-      if (updatedProduct.countInStock !== product.countInStock) {
-        await session.abortTransaction();
-        await session.endSession();
+        const message = `An order for product ${product.name} could not be created`;
+        console.error('ORDER CREATION FAILED: ', message);
         return handleConflict(orderData, res, session, retries);
       }
 
@@ -105,7 +92,13 @@ async function createOrderWithRetry(orderData, res, retries) {
     await session.abortTransaction();
     await session.endSession();
 
-    return res.status(500).json({ type: err.name, message: err.message });
+    return console.error(
+      'ORDER CREATION FAILED: ',
+      JSON.stringify({
+        type: err.name,
+        message: err.message,
+      })
+    );
   }
 }
 
@@ -124,13 +117,15 @@ async function addOrder(session, orderData, res) {
   if (!order) {
     await session.abortTransaction();
     await session.endSession();
-    return res.status(500).json({ message: 'The order could not be created' });
+    return console.error(
+      'ORDER CREATION FAILED: The order could not be created'
+    );
   }
 
   await session.commitTransaction();
   await session.endSession();
 
-  return res.status(201).json(order);
+  return order;
 }
 
 async function resolveOrderTotal(orderItemsIds, session) {
