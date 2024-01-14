@@ -4,6 +4,8 @@
 const stripe = require('stripe')(process.env.STRIPE_KEY);
 const { User } = require('../models/user');
 const orderController = require('./orders');
+const mailSender = require('../helpers/email_sender');
+const { Product } = require('../models/product');
 
 exports.checkout = async (req, res) => {
   const accessToken = req.header('Authorization').replace('Bearer', '').trim();
@@ -13,6 +15,17 @@ exports.checkout = async (req, res) => {
   if (!user) {
     return res.status(404).json({ message: 'User not found!' });
   }
+
+  for (const cartItem of req.body.cartItems) {
+    const product = await Product.findById(cartItem.product);
+    if (!product) {
+      return res.status(404).json({ message: `${cartItem.name} not found!` });
+    } else if (product.countInStock < cartItem.quantity) {
+      const message = `${product.name}\nOrder for ${cartItem.quantity}, but only ${product.countInStock} left in stock`;
+      return res.status(400).json({ message });
+    }
+  }
+
   let customerId;
   if (user.paymentCustomerId) {
     customerId = user.paymentCustomerId;
@@ -122,6 +135,7 @@ exports.webhook = (req, res) => {
           { new: true }
         );
         // send email
+        mailSender.sendMail('Your Ecomly order');
       })
       .catch((err) => console.log(err.message));
   } else {
