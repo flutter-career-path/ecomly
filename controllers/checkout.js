@@ -377,11 +377,14 @@ exports.webhook = (req, res) => {
           },
           res
         );
-        const user = await User.findByIdAndUpdate(
-          customer.metadata.userId,
-          { paymentCustomerId: session.customer },
-          { new: true }
-        );
+        let user = await User.findById(customer.metadata.userId);
+        if (user && !user.paymentCustomerId) {
+          user = await User.findByIdAndUpdate(
+            customer.metadata.userId,
+            { paymentCustomerId: session.customer },
+            { new: true }
+          );
+        }
         // send email
         await mailSender.sendMail(
           'Your Ecomly order',
