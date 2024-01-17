@@ -7,25 +7,25 @@ const { CartProduct } = require('../models/cart_product');
 
 const MAX_RETRIES = 3;
 
-async function handleConflict(orderData, res, session, retries) {
+async function handleConflict(orderData, session, retries) {
   if (retries < MAX_RETRIES) {
     // Handle the conflict, wait a moment, and retry
     await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait for a second
-    return createOrderWithRetry(orderData, res, retries + 1);
+    return createOrderWithRetry(orderData, retries + 1);
   } else {
     // Maximum retries reached, handle it as you see fit
     await session.abortTransaction();
     await session.endSession();
-    return console.error(
+    return console.trace(
       'ORDER CREATION FAILED: Order conflict, please try again later'
     );
   }
 }
 
-async function createOrderWithRetry(orderData, res, retries) {
+async function createOrderWithRetry(orderData, retries) {
   retries = retries ?? 0;
   if (!mongoose.isValidObjectId(orderData.user)) {
-    return res.status(500).json({ message: 'Invalid user!' });
+    return console.error('User Validation Failed: Invalid user!');
   }
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -35,7 +35,7 @@ async function createOrderWithRetry(orderData, res, retries) {
     if (!user) {
       await session.abortTransaction();
       await session.endSession();
-      return console.error('ORDER CREATION FAILED: User not found');
+      return console.trace('ORDER CREATION FAILED: User not found');
     }
 
     const orderItems = orderData.orderItems;
@@ -47,7 +47,7 @@ async function createOrderWithRetry(orderData, res, retries) {
       ) {
         await session.abortTransaction();
         await session.endSession();
-        return console.error(
+        return console.trace(
           'ORDER CREATION FAILED: Invalid product in the order'
         );
       }
@@ -55,18 +55,18 @@ async function createOrderWithRetry(orderData, res, retries) {
       if (!cartProduct) {
         await session.abortTransaction();
         await session.endSession();
-        return console.error(
+        return console.trace(
           'ORDER CREATION FAILED: Invalid product in the order'
         );
       }
-      let orderItemModel = new OrderItem(orderItem);
+      let orderItemModel = await new OrderItem(orderItem).save({ session });
       const product = await Product.findById(orderItem.product);
       if (!orderItemModel) {
         await session.abortTransaction();
         await session.endSession();
         const message = `An order for product ${product.name} could not be created`;
-        console.error('ORDER CREATION FAILED: ', message);
-        return handleConflict(orderData, res, session, retries);
+        console.trace('ORDER CREATION FAILED: ', message);
+        return handleConflict(orderData, session, retries);
       }
 
       if (!cartProduct.reserved) {
@@ -87,12 +87,12 @@ async function createOrderWithRetry(orderData, res, retries) {
 
     orderData['orderItems'] = orderItemsIds;
 
-    return await addOrder(session, orderData, res);
+    return await addOrder(session, orderData);
   } catch (err) {
     await session.abortTransaction();
     await session.endSession();
-
-    return console.error(
+    console.error(err);
+    return console.log(
       'ORDER CREATION FAILED: ',
       JSON.stringify({
         type: err.name,
@@ -102,22 +102,18 @@ async function createOrderWithRetry(orderData, res, retries) {
   }
 }
 
-async function addOrder(session, orderData, res) {
-  orderData['totalPrice'] = await resolveOrderTotal(
-    orderData.orderItems,
-    session
-  );
+async function addOrder(session, orderData) {
   let order = new Order(orderData);
+
   order.status = 'processed';
   order.statusHistory.push('processed');
-  await order.save();
 
   order = await order.save({ session });
 
   if (!order) {
     await session.abortTransaction();
     await session.endSession();
-    return console.error(
+    return console.trace(
       'ORDER CREATION FAILED: The order could not be created'
     );
   }
@@ -128,20 +124,8 @@ async function addOrder(session, orderData, res) {
   return order;
 }
 
-async function resolveOrderTotal(orderItemsIds, session) {
-  const totalPrices = await Promise.all(
-    orderItemsIds.map(async (orderItemId) => {
-      const orderItem = await OrderItem.findOne(orderItemId)
-        .session(session)
-        .populate('product', 'price');
-      return orderItem.product.price * orderItem.quantity;
-    })
-  );
-  return totalPrices.reduce((a, b) => a + b, 0);
-}
-
-exports.addOrder = async (orderData, res) => {
-  await createOrderWithRetry(orderData, res, 0);
+exports.addOrder = async (orderData) => {
+  return await createOrderWithRetry(orderData, 0);
 };
 
 exports.getUserOrders = async (req, res) => {
