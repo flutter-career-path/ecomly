@@ -25,7 +25,7 @@ exports.checkout = async (req, res) => {
         'https://img.freepik.com/free-psd/isolated-cardboard-box_125540-1169.jpg?w=1060&t=st=1705342136~exp=1705342736~hmac=3b4449a587dd227ed0f2d66f0c0eca550f75a79dc0b19284d8624b4a91f66f6a'
       );
     }
-    const product = await Product.findById(cartItem.product);
+    const product = await Product.findById(cartItem.productId);
     if (!product) {
       return res.status(404).json({ message: `${cartItem.name} not found!` });
     } else if (product.countInStock < cartItem.quantity) {
@@ -39,10 +39,7 @@ exports.checkout = async (req, res) => {
     customerId = user.paymentCustomerId;
   } else {
     const customer = await stripe.customers.create({
-      metadata: {
-        userId: tokenData.id,
-        cart: JSON.stringify(req.body.cartItems.toString()),
-      },
+      metadata: { userId: tokenData.id },
     });
     customerId = customer.id;
   }
@@ -58,17 +55,26 @@ exports.checkout = async (req, res) => {
             images: item.images,
             // description:
             metadata: {
+              productId: item.productId,
+              cartProductId: item.cartProductId,
               selectedSize: item.selectedSize ?? undefined,
               selectedColour: item.selectedColour ?? undefined,
             },
           },
-          unit_amount: item.price * 100,
+          unit_amount: (item.price * 100).toFixed(0),
         },
         quantity: item.quantity,
       };
     }),
+    // invoice_creation: { enabled: true },
+    payment_method_options: {
+      card: { setup_future_usage: 'on_session' },
+    },
     billing_address_collection: 'auto',
     // allowed_countries
+    // you can also persist the shipping address from the webhook after checkout and on the next iteration, if the user.shippingAddress above is not null
+    // then you pass it here and remove the `shipping_address_collection` as you can't pass both
+    // src: https://stackoverflow.com/a/76326650/17971158
     shipping_address_collection: {
       allowed_countries: [
         'AC',
@@ -312,6 +318,7 @@ exports.checkout = async (req, res) => {
     },
     phone_number_collection: { enabled: true },
     customer: customerId,
+    metadata: { orderId: '2390f902f' },
     mode: 'payment',
     // appearance: {
     //   theme: isDarkMode ? 'night' : 'stripe',
@@ -343,42 +350,57 @@ exports.webhook = (req, res) => {
     return;
   }
 
-  if (event.type === 'checkout.session.succeeded') {
+  if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
 
     stripe.customers
       .retrieve(session.customer)
       .then(async (customer) => {
-        const orderItems = JSON.parse(customer.metadata.cart).map((item) => {
+        const lineItems = await stripe.checkout.sessions.listLineItems(
+          session.id,
+          { expand: ['data.price.product'] }
+        );
+        // for (const item of lineItems.data) {
+        //   console.info('item: %o', item);
+        // }
+        // console.log('--------------------------------------');
+        // console.log('--------------------------------------');
+        // console.info('CUSTOMER: ', customer);
+        // console.log('--------------------------------------');
+        // console.log('--------------------------------------');
+        // console.info('SESSION: ', session);
+
+        const orderItems = lineItems.data.map((item) => {
           return {
             quantity: item.quantity,
-            product: item.product,
-            cartProductId: item.cartProductId,
-            productPrice: item.price,
-            productName: item.name,
-            productImage: item.images[0],
-            selectedSize: item.selectedSize ?? undefined,
-            selectedColour: item.selectedColour ?? undefined,
+            product: item.price.product.metadata.productId,
+            cartProductId: item.price.product.metadata.cartProductId,
+            productPrice: item.price.unit_amount / 100,
+            productName: item.price.product.name,
+            productImage: item.price.product.images[0],
+            selectedSize: item.price.product.metadata.selectedSize ?? undefined,
+            selectedColour:
+              item.price.product.metadata.selectedColour ?? undefined,
           };
         });
-        const address = session.customer_details.address;
-        const order = await orderController.addOrder(
-          {
-            orderItems: orderItems,
-            shippingAddress1:
-              address.line1 === 'N/A' ? address.line2 : address.line1,
-            city: address.city,
-            postalCode: address.postal_code,
-            country: address.country,
-            totalPrice: session.amount_total,
-            phone: session.customer_details.phone,
-            user: customer.metadata.userId,
-            paymentId: session.payment_intent,
-          },
-          res
-        );
+        const address =
+          session.shipping_details?.address ?? session.customer_details.address;
+        const order = await orderController.addOrder({
+          orderItems: orderItems,
+          shippingAddress1:
+            address.line1 === 'N/A' ? address.line2 : address.line1,
+          city: address.city,
+          postalCode: address.postal_code,
+          country: address.country,
+          totalPrice: session.amount_total / 100,
+          phone: session.customer_details.phone,
+          user: customer.metadata.userId,
+          paymentId: session.payment_intent,
+        });
+        console.info('DONE CREATING ORDER\nFinding user...');
         let user = await User.findById(customer.metadata.userId);
         if (user && !user.paymentCustomerId) {
+          console.info('USER FOUND, updating user stripe data...');
           user = await User.findByIdAndUpdate(
             customer.metadata.userId,
             { paymentCustomerId: session.customer },
@@ -386,16 +408,21 @@ exports.webhook = (req, res) => {
           );
         }
         // send email
+        // using the lean() method to convert the Mongoose document to a plain JavaScript object before modifying
+        const leanOrder = order.toObject();
+        leanOrder['orderItems'] = orderItems;
         await mailSender.sendMail(
+          session.customer_details.email ?? user.email,
           'Your Ecomly order',
           mailBuilder.buildEmail(
             user.name,
-            order,
+            leanOrder,
             session.customer_details.name
           )
         );
+        console.log('MAIL SENT');
       })
-      .catch((err) => console.log(err.message));
+      .catch((err) => console.log('WEBHOOK ERROR CATCHER: ', err.message));
   } else {
     console.log(`Unhandled event type ${event.type}`);
   }
