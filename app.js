@@ -17,8 +17,11 @@ require('dotenv').config();
 const app = express();
 const env = process.env;
 
+const API = env.API_URL;
+
 app.use(cors());
 app.options('*', cors());
+app.use(`${API}/checkout/webhook`, express.raw({ type: 'application/json' }));
 app.use(bodyParser.json());
 app.use(morgan('tiny'));
 app.use(authJwt());
@@ -32,8 +35,6 @@ const usersRouter = require('./routes/users');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const checkoutRouter = require('./routes/checkout');
-
-const API = env.API_URL;
 
 app.use(`${API}/products`, productsRouter);
 app.use(`${API}/categories`, categoriesRouter);
