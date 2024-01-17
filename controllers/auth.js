@@ -132,6 +132,7 @@ exports.forgotPassword = async (req, res) => {
 
     // Send an email with the OTP
     return mailSender.sendMail(
+      email,
       'Password Reset OTP',
       `Your OTP for password reset is: ${otp}`,
       'Password reset OTP sent to your email',
