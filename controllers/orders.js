@@ -131,14 +131,19 @@ exports.addOrder = async (orderData) => {
 exports.getUserOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.params.userId })
+      .select('orderItems status totalPrice dateOrdered')
       .populate({
         path: 'orderItems',
-        populate: {
-          path: 'product',
-          select: 'name',
-          populate: { path: 'category', select: 'name' },
-        },
+        select: 'productName productImage',
       })
+      // .populate({
+      //   path: 'orderItems',
+      //   populate: {
+      //     path: 'product',
+      //     select: 'name',
+      //     populate: { path: 'category', select: 'name' },
+      //   },
+      // })
       .sort({ dateOrdered: -1 });
     if (!orders) {
       return res.status(404).json({ message: 'Product not found' });
@@ -163,16 +168,7 @@ exports.getUserOrders = async (req, res) => {
 
 exports.getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .select('-statusHistory')
-      .populate('user', 'name email')
-      .populate({
-        path: 'orderItems',
-        populate: {
-          path: 'product',
-          populate: { path: 'category', select: 'name' },
-        },
-      });
+    const order = await Order.findById(req.params.id).populate('orderItems');
     if (!order) {
       return res.status(404).json({ message: 'Order not found' });
     }

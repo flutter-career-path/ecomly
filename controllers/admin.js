@@ -204,6 +204,8 @@ exports.changeOrderStatus = async (req, res) => {
       statusTransitions[order.status].includes(newStatus)
     ) {
       // Add the old status to the statusHistory
+      // You should probably add the new status to history, with the added date, then when fetching always fetch the statusHistory minus the last one
+      // this way, you have better tracking of the time a status changed
       if (!order.statusHistory.includes(order.status)) {
         order.statusHistory.push(order.status);
       }
@@ -218,6 +220,7 @@ exports.changeOrderStatus = async (req, res) => {
     } else {
       return res.status(400).json({
         message: `Invalid status update\nStatus cannot go directly from ${order.status} to ${newStatus}`,
+        possibleStatuses: statusTransitions[order.status],
       });
     }
   } catch (err) {
