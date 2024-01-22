@@ -131,13 +131,14 @@ exports.forgotPassword = async (req, res) => {
     await user.save();
 
     // Send an email with the OTP
-    return mailSender.sendMail(
+    await mailSender.sendMail(
       email,
       'Password Reset OTP',
       `Your OTP for password reset is: ${otp}`,
       'Password reset OTP sent to your email',
       'Error sending email'
     );
+    return res.status(200).end();
   } catch (error) {
     console.error('Reset Password error:', error);
     return res.status(500).json({ type: error.name, message: error.message });
